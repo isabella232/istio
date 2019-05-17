@@ -1,0 +1,53 @@
+containers:
+  default:
+    docker: gcr.io/istio-testing/circleci:2019-04-22
+    workdir: /go/src/istio.io/istio
+  production:
+    build:
+      command: ./.shopify-build/build-images.sh
+      timeout: 10m
+
+steps:
+- label: Build
+  timeout: 10m
+  run:
+  - make sync
+  - make build
+  # These two artifacts are 700MB+ and not used in building the docker images
+  # TODO(spike): It would be better to exclude this using the artifact_paths pattern matching
+  # but I can't get extended globbing in Ruby to work as expected :(
+  # See shopify-build/blob/master/lib/shopify_build/artifact_export_directory.rb#L237
+  # (ArtifactExportDirectory#process_single_directory)
+  - rm /go/out/linux_amd64/release/envoy
+  - rm /go/out/linux_amd64/debug/envoy-debug-*
+  artifact_paths:
+  # We can't use /go/out/linux_amd64/release as the path because it changes the
+  # folder permissions, so we have to go a few levels up
+  - path: /go/out/
+    required: true
+  env:
+    TAG: $BUILDKITE_BRANCH
+  git:
+    history: shallow
+
+- wait
+
+  # Splitting tests and increasing parallelism cause test failures. This may be
+  # due to previously seen issues with Buildkite, where tests that test
+  # timeouts, elapsed time, or ticker speeds can be flaky. Unfortunately, this
+  # means that this step can and will take over 30 minutes.
+- label: Test - unit
+  timeout: 30m
+  run:
+  - make localTestEnv
+  - make test
+  artifact_paths:
+  - path: /go/out/tests
+  env:
+    TAG: $BUILDKITE_BRANCH
+  git:
+    history: shallow
+
+- wait
+
+- build: production
