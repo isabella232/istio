@@ -1016,6 +1016,12 @@ func buildDefaultPassthroughCluster(env *model.Environment) *apiv2.Cluster {
 		ConnectTimeout:       util.GogoDurationToDuration(env.Mesh.ConnectTimeout),
 		LbPolicy:             apiv2.Cluster_ORIGINAL_DST_LB,
 	}
+	passthroughSettings := &networking.ConnectionPoolSettings{
+		Tcp: &networking.ConnectionPoolSettings_TCPSettings{
+			MaxConnections: 1024 * 10,
+		},
+	}
+	applyConnectionPool(env, cluster, passthroughSettings, model.TrafficDirectionOutbound)
 	return cluster
 }
 
