@@ -40,7 +40,7 @@ steps:
   timeout: 30m
   run:
   - make localTestEnv
-  - make test
+  - make galley-test
   artifact_paths:
   - path: /go/out/tests
   env:
